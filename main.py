@@ -7,7 +7,7 @@ import torchaudio
 from pyannote.audio import Pipeline
 
 
-BUFFER = 0.250
+BUFFER = 0.5
 
 
 def get_energy(audio_path, start, end):
@@ -33,20 +33,14 @@ def detect_segments(audio_path, pipeline):
 
     segments = []
     for turn, _, _ in annotation.itertracks(yield_label=True):
-        segments.append({
-            'start': max(0, turn.start - BUFFER),
-            'end': turn.end + BUFFER
-        })
+        segments.append({'start': max(0, turn.start - BUFFER), 'end': turn.end + BUFFER})
 
     return segments
 
 
 def merge_and_attribute(segs_mic1, segs_mic2, audio1, audio2):
-    # Calculer energie globale pour normalisation
     global_e1 = get_global_energy(audio1)
     global_e2 = get_global_energy(audio2)
-
-    print(f"Energie globale mic1: {global_e1:.4f}, mic2: {global_e2:.4f}")
 
     all_times = set()
     for seg in segs_mic1 + segs_mic2:
@@ -67,11 +61,9 @@ def merge_and_attribute(segs_mic1, segs_mic2, audio1, audio2):
             e1 = get_energy(audio1, start, end) if in_mic1 else 0
             e2 = get_energy(audio2, start, end) if in_mic2 else 0
 
-            # Normaliser par energie globale
             e1_norm = e1 / global_e1 if global_e1 > 0 else 0
             e2_norm = e2 / global_e2 if global_e2 > 0 else 0
 
-            # Ratio plus grand pour plus de certitude
             if e1_norm > e2_norm * 1.5:
                 speaker = "Presentateur"
             elif e2_norm > e1_norm * 1.5:
@@ -112,7 +104,6 @@ def main():
         print("Fichiers non trouves")
         return
 
-    print("Chargement du modele...")
     if args.hf_token:
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=args.hf_token)
     else:
@@ -121,13 +112,8 @@ def main():
     if torch.cuda.is_available():
         pipeline.to(torch.device("cuda"))
 
-    print(f"Analyse {p1.name}...")
     segs1 = detect_segments(p1, pipeline)
-
-    print(f"Analyse {p2.name}...")
     segs2 = detect_segments(p2, pipeline)
-
-    print("Fusion et attribution...")
     final = merge_and_attribute(segs1, segs2, p1, p2)
 
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
@@ -136,9 +122,7 @@ def main():
     stats = {s: sum(1 for seg in final if seg['speaker'] == s)
              for s in ['Presentateur', 'Invite', 'Overlap']}
 
-    print(f"\nTermine! {len(final)} segments")
-    print(f"Presentateur: {stats['Presentateur']}, Invite: {stats['Invite']}, "
-          f"Overlap: {stats['Overlap']}")
+    print(f"{len(final)} segments - P:{stats['Presentateur']} I:{stats['Invite']} O:{stats['Overlap']}")
 
 
 if __name__ == "__main__":
