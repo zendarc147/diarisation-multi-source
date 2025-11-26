@@ -1,0 +1,66 @@
+# Environnement virtuel
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Fichiers audio (peuvent être volumineux)
+audio_input/*.wav
+audio_input/*.mp3
+audio_input/*.flac
+audio_output/*.wav
+audio_output/*.mp3
+
+# Résultats
+results/*.txt
+results/*.json
+
+# Données
+data/*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Variables d'environnement (contient des tokens)
+.env
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Modèles téléchargés
+models/
+checkpoints/
+
+# Logs
+*.log
+logs/

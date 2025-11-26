@@ -1,0 +1,21 @@
+# Core audio processing
+numpy>=1.24.0
+scipy>=1.10.0
+soundfile>=0.12.0
+
+# Diarization and speaker recognition
+pyannote.audio>=3.1.0
+
+# Audio utilities
+pydub>=0.25.1
+librosa>=0.10.0
+
+# Deep learning (required by pyannote)
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Visualization (optional but useful)
+matplotlib>=3.7.0
+
+# Utilities
+tqdm>=4.65.0
