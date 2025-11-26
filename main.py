@@ -63,10 +63,10 @@ def main():
         return
 
     print("Chargement du modele...")
-    pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1",
-        use_auth_token=args.hf_token
-    )
+    if args.hf_token:
+        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=args.hf_token)
+    else:
+        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
 
     if torch.cuda.is_available():
         pipeline.to(torch.device("cuda"))
