@@ -10,20 +10,20 @@ from pyannote.audio import Pipeline
 BUFFER = 0.5
 
 
-def get_energy(audio_path, start, end):
-    waveform, sr = torchaudio.load(audio_path)
-    start_sample = int(start * sr)
-    end_sample = int(end * sr)
-    segment = waveform[:, start_sample:end_sample]
-    return torch.mean(torch.abs(segment)).item()
+def calc_energie(audio_path, debut, fin):
+    son, sr = torchaudio.load(audio_path)
+    debut_sample = int(debut * sr)
+    fin_sample = int(fin * sr)
+    morceau = son[:, debut_sample:fin_sample]
+    return torch.mean(torch.abs(morceau)).item()
 
 
-def get_global_energy(audio_path):
-    waveform, _ = torchaudio.load(audio_path)
-    return torch.mean(torch.abs(waveform)).item()
+def energie_globale(audio_path):
+    son, _ = torchaudio.load(audio_path)
+    return torch.mean(torch.abs(son)).item()
 
 
-def detect_segments(audio_path, pipeline):
+def detecter_segments(audio_path, pipeline):
     diarization = pipeline(str(audio_path))
 
     if hasattr(diarization, 'speaker_diarization'):
@@ -31,61 +31,61 @@ def detect_segments(audio_path, pipeline):
     else:
         annotation = diarization
 
-    segments = []
+    segs = []
     for turn, _, _ in annotation.itertracks(yield_label=True):
-        segments.append({'start': max(0, turn.start - BUFFER), 'end': turn.end + BUFFER})
+        segs.append({'start': max(0, turn.start - BUFFER), 'end': turn.end + BUFFER})
 
-    return segments
+    return segs
 
 
-def merge_and_attribute(segs_mic1, segs_mic2, audio1, audio2):
-    global_e1 = get_global_energy(audio1)
-    global_e2 = get_global_energy(audio2)
+def fusionner(segs_mic1, segs_mic2, audio1, audio2):
+    energie_moy1 = energie_globale(audio1)
+    energie_moy2 = energie_globale(audio2)
 
-    all_times = set()
+    tous_temps = set()
     for seg in segs_mic1 + segs_mic2:
-        all_times.add(seg['start'])
-        all_times.add(seg['end'])
+        tous_temps.add(seg['start'])
+        tous_temps.add(seg['end'])
 
-    all_times = sorted(all_times)
-    final = []
+    tous_temps = sorted(tous_temps)
+    resultat = []
 
-    for i in range(len(all_times) - 1):
-        start = all_times[i]
-        end = all_times[i + 1]
+    for i in range(len(tous_temps) - 1):
+        debut = tous_temps[i]
+        fin = tous_temps[i + 1]
 
-        in_mic1 = any(s['start'] <= start < s['end'] for s in segs_mic1)
-        in_mic2 = any(s['start'] <= start < s['end'] for s in segs_mic2)
+        dans_mic1 = any(s['start'] <= debut < s['end'] for s in segs_mic1)
+        dans_mic2 = any(s['start'] <= debut < s['end'] for s in segs_mic2)
 
-        if in_mic1 or in_mic2:
-            e1 = get_energy(audio1, start, end) if in_mic1 else 0
-            e2 = get_energy(audio2, start, end) if in_mic2 else 0
+        if dans_mic1 or dans_mic2:
+            e1 = calc_energie(audio1, debut, fin) if dans_mic1 else 0
+            e2 = calc_energie(audio2, debut, fin) if dans_mic2 else 0
 
-            e1_norm = e1 / global_e1 if global_e1 > 0 else 0
-            e2_norm = e2 / global_e2 if global_e2 > 0 else 0
+            e1_norm = e1 / energie_moy1 if energie_moy1 > 0 else 0
+            e2_norm = e2 / energie_moy2 if energie_moy2 > 0 else 0
 
             if e1_norm > e2_norm * 1.5:
-                speaker = "Presentateur"
+                qui = "Presentateur"
             elif e2_norm > e1_norm * 1.5:
-                speaker = "Invite"
+                qui = "Invite"
             else:
-                speaker = "Overlap"
+                qui = "Overlap"
 
-            if final and final[-1]['speaker'] == speaker:
-                final[-1]['end'] = end
+            if resultat and resultat[-1]['speaker'] == qui:
+                resultat[-1]['end'] = fin
             else:
-                final.append({'start': start, 'end': end, 'speaker': speaker})
+                resultat.append({'start': debut, 'end': fin, 'speaker': qui})
 
-    return final
+    return resultat
 
 
-def save_results(segments, output):
+def sauver_resultats(segments, output):
     with open(output, 'w') as f:
         f.write("DIARISATION\n\n")
         for i, seg in enumerate(segments, 1):
-            duration = seg['end'] - seg['start']
+            duree = seg['end'] - seg['start']
             f.write(f"Segment {i:03d} | {seg['speaker']:12} | "
-                   f"{seg['start']:7.2f}s - {seg['end']:7.2f}s | {duration:.2f}s\n")
+                   f"{seg['start']:7.2f}s - {seg['end']:7.2f}s | {duree:.2f}s\n")
 
 
 def main():
@@ -97,10 +97,10 @@ def main():
 
     args = parser.parse_args()
 
-    p1 = Path(args.presentateur)
-    p2 = Path(args.invite)
+    fichier1 = Path(args.presentateur)
+    fichier2 = Path(args.invite)
 
-    if not p1.exists() or not p2.exists():
+    if not fichier1.exists() or not fichier2.exists():
         print("Fichiers non trouves")
         return
 
@@ -112,12 +112,12 @@ def main():
     if torch.cuda.is_available():
         pipeline.to(torch.device("cuda"))
 
-    segs1 = detect_segments(p1, pipeline)
-    segs2 = detect_segments(p2, pipeline)
-    final = merge_and_attribute(segs1, segs2, p1, p2)
+    segs1 = detecter_segments(fichier1, pipeline)
+    segs2 = detecter_segments(fichier2, pipeline)
+    final = fusionner(segs1, segs2, fichier1, fichier2)
 
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    save_results(final, args.output)
+    sauver_resultats(final, args.output)
 
     stats = {s: sum(1 for seg in final if seg['speaker'] == s)
              for s in ['Presentateur', 'Invite', 'Overlap']}
