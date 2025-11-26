@@ -1,12 +1,6 @@
 # Diarisation Multi-Source
 
-Workflow de diarisation audio pour interviews stereo avec bleeding entre canaux.
-
-## Workflow en 3 étapes
-
-**Step 1**: Extraction des canaux et downsampling
-**Step 2**: Diarisation de chaque canal séparément
-**Step 3**: Combinaison en fichier .eaf (ELAN) ou .TextGrid (Praat)
+Diarisation audio pour interviews avec bleeding entre micros.
 
 ## Installation
 
@@ -16,7 +10,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Configuration HuggingFace
+## Configuration
 
 ```bash
 huggingface-cli login
@@ -27,35 +21,16 @@ Accepter les conditions : https://huggingface.co/pyannote/speaker-diarization-3.
 ## Utilisation
 
 ```bash
-# Format ELAN (.eaf)
-python main.py --source interview.wav --format eaf
-
-# Format Praat (.TextGrid)
-python main.py --source interview.wav --format TextGrid
+python main.py --presentateur mic1.wav --invite mic2.wav
 ```
 
-## Structure des sorties
+Resultat dans `results/diarisation.txt`
 
-```
-results/
-├── prepared/
-│   ├── interview_left.wav   # Canal gauche 16kHz
-│   └── interview_right.wav  # Canal droit 16kHz
-└── interview.eaf            # Fichier de sortie
-```
+## Fonctionnement
 
-## Tiers créés
+1. Detecte les segments de parole sur chaque micro
+2. Compare l'energie audio entre les deux micros
+3. Attribue chaque segment au bon locuteur
+4. Detecte les chevauchements
 
-Pour les fichiers .eaf :
-- `Interviewer_probable` : Segments du présentateur
-- `Interviewer_unlikely` : Alternative (si inversion détectée)
-- `Subject_probable` : Segments de l'invité
-- `Subject_unlikely` : Alternative
-
-Le système détermine automatiquement qui parle le plus sur quel canal.
-
-## Paramètres
-
-Modifier dans le code si nécessaire :
-- `BUFFER = 0.250` : Extension des segments (secondes)
-- `TARGET_SR = 16000` : Fréquence d'échantillonnage cible
+Le buffer de 0.250s etend chaque segment pour eviter les coupures.
