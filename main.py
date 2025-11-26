@@ -18,6 +18,11 @@ def get_energy(audio_path, start, end):
     return torch.mean(torch.abs(segment)).item()
 
 
+def get_global_energy(audio_path):
+    waveform, _ = torchaudio.load(audio_path)
+    return torch.mean(torch.abs(waveform)).item()
+
+
 def detect_segments(audio_path, pipeline):
     diarization = pipeline(str(audio_path))
 
@@ -37,6 +42,12 @@ def detect_segments(audio_path, pipeline):
 
 
 def merge_and_attribute(segs_mic1, segs_mic2, audio1, audio2):
+    # Calculer energie globale pour normalisation
+    global_e1 = get_global_energy(audio1)
+    global_e2 = get_global_energy(audio2)
+
+    print(f"Energie globale mic1: {global_e1:.4f}, mic2: {global_e2:.4f}")
+
     all_times = set()
     for seg in segs_mic1 + segs_mic2:
         all_times.add(seg['start'])
@@ -56,9 +67,14 @@ def merge_and_attribute(segs_mic1, segs_mic2, audio1, audio2):
             e1 = get_energy(audio1, start, end) if in_mic1 else 0
             e2 = get_energy(audio2, start, end) if in_mic2 else 0
 
-            if e1 > e2 * 1.2:
+            # Normaliser par energie globale
+            e1_norm = e1 / global_e1 if global_e1 > 0 else 0
+            e2_norm = e2 / global_e2 if global_e2 > 0 else 0
+
+            # Ratio plus grand pour plus de certitude
+            if e1_norm > e2_norm * 1.5:
                 speaker = "Presentateur"
-            elif e2 > e1 * 1.2:
+            elif e2_norm > e1_norm * 1.5:
                 speaker = "Invite"
             else:
                 speaker = "Overlap"
