@@ -1,6 +1,12 @@
 # Diarisation Multi-Source
 
-Projet de diarisation audio pour interviews avec deux pistes séparées.
+Workflow de diarisation audio pour interviews stereo avec bleeding entre canaux.
+
+## Workflow en 3 étapes
+
+**Step 1**: Extraction des canaux et downsampling
+**Step 2**: Diarisation de chaque canal séparément
+**Step 3**: Combinaison en fichier .eaf (ELAN) ou .TextGrid (Praat)
 
 ## Installation
 
@@ -10,27 +16,46 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Configuration
+## Configuration HuggingFace
 
-Créer un compte HuggingFace et accepter les conditions :
-- https://huggingface.co/pyannote/speaker-diarization-3.1
-
-Se connecter :
 ```bash
 huggingface-cli login
 ```
 
+Accepter les conditions : https://huggingface.co/pyannote/speaker-diarization-3.1
+
 ## Utilisation
 
 ```bash
-python main.py --presentateur audio1.wav --invite audio2.wav
+# Format ELAN (.eaf)
+python main.py --source interview.wav --format eaf
+
+# Format Praat (.TextGrid)
+python main.py --source interview.wav --format TextGrid
 ```
 
-Le résultat sera dans `results/diarisation.txt`
+## Structure des sorties
 
-## Options
+```
+results/
+├── prepared/
+│   ├── interview_left.wav   # Canal gauche 16kHz
+│   └── interview_right.wav  # Canal droit 16kHz
+└── interview.eaf            # Fichier de sortie
+```
 
-- `--presentateur` : fichier audio du présentateur
-- `--invite` : fichier audio de l'invité
-- `--output` : fichier de sortie (défaut: results/diarisation.txt)
-- `--hf-token` : token HuggingFace (optionnel)
+## Tiers créés
+
+Pour les fichiers .eaf :
+- `Interviewer_probable` : Segments du présentateur
+- `Interviewer_unlikely` : Alternative (si inversion détectée)
+- `Subject_probable` : Segments de l'invité
+- `Subject_unlikely` : Alternative
+
+Le système détermine automatiquement qui parle le plus sur quel canal.
+
+## Paramètres
+
+Modifier dans le code si nécessaire :
+- `BUFFER = 0.250` : Extension des segments (secondes)
+- `TARGET_SR = 16000` : Fréquence d'échantillonnage cible
