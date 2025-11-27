@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 
-import argparse
-from pathlib import Path
+import gradio as gr
 import torch
-import torchaudio
 from pyannote.audio import Pipeline
+from pathlib import Path
+import tempfile
 
 
 BUFFER = 0.5
+pipeline = None
 
 
 def calc_energie(audio_path, debut, fin):
+    import torchaudio
     son, sr = torchaudio.load(audio_path)
     debut_sample = int(debut * sr)
     fin_sample = int(fin * sr)
@@ -19,6 +21,7 @@ def calc_energie(audio_path, debut, fin):
 
 
 def energie_globale(audio_path):
+    import torchaudio
     son, _ = torchaudio.load(audio_path)
     return torch.mean(torch.abs(son)).item()
 
@@ -79,51 +82,47 @@ def fusionner(segs_mic1, segs_mic2, audio1, audio2):
     return resultat
 
 
-def sauver_resultats(segments, output):
-    with open(output, 'w') as f:
-        f.write("DIARISATION\n\n")
-        for i, seg in enumerate(segments, 1):
-            duree = seg['end'] - seg['start']
-            f.write(f"Segment {i:03d} | {seg['speaker']:12} | "
-                   f"{seg['start']:7.2f}s - {seg['end']:7.2f}s | {duree:.2f}s\n")
+def traiter(audio_pres, audio_inv):
+    global pipeline
 
+    if audio_pres is None or audio_inv is None:
+        return "Veuillez uploader les deux fichiers audio"
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--presentateur", required=True)
-    parser.add_argument("--invite", required=True)
-    parser.add_argument("--output", default="results/diarisation.txt")
-    parser.add_argument("--hf-token", default=None)
-
-    args = parser.parse_args()
-
-    fichier1 = Path(args.presentateur)
-    fichier2 = Path(args.invite)
-
-    if not fichier1.exists() or not fichier2.exists():
-        print("Fichiers non trouves")
-        return
-
-    if args.hf_token:
-        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=args.hf_token)
-    else:
+    if pipeline is None:
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
+        if torch.cuda.is_available():
+            pipeline.to(torch.device("cuda"))
 
-    if torch.cuda.is_available():
-        pipeline.to(torch.device("cuda"))
-
-    segs1 = detecter_segments(fichier1, pipeline)
-    segs2 = detecter_segments(fichier2, pipeline)
-    final = fusionner(segs1, segs2, fichier1, fichier2)
-
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    sauver_resultats(final, args.output)
+    segs1 = detecter_segments(audio_pres, pipeline)
+    segs2 = detecter_segments(audio_inv, pipeline)
+    final = fusionner(segs1, segs2, audio_pres, audio_inv)
 
     stats = {s: sum(1 for seg in final if seg['speaker'] == s)
              for s in ['Presentateur', 'Invite', 'Overlap']}
 
-    print(f"{len(final)} segments - P:{stats['Presentateur']} I:{stats['Invite']} O:{stats['Overlap']}")
+    resultat_texte = "DIARISATION\n\n"
+    for i, seg in enumerate(final, 1):
+        duree = seg['end'] - seg['start']
+        resultat_texte += f"Segment {i:03d} | {seg['speaker']:12} | "
+        resultat_texte += f"{seg['start']:7.2f}s - {seg['end']:7.2f}s | {duree:.2f}s\n"
+
+    resultat_texte += f"\n{len(final)} segments - "
+    resultat_texte += f"P:{stats['Presentateur']} I:{stats['Invite']} O:{stats['Overlap']}"
+
+    return resultat_texte
+
+
+interface = gr.Interface(
+    fn=traiter,
+    inputs=[
+        gr.Audio(type="filepath", label="Audio Presentateur"),
+        gr.Audio(type="filepath", label="Audio Invite")
+    ],
+    outputs=gr.Textbox(label="Resultats", lines=20),
+    title="Diarisation Multi-Source",
+    description="Upload les deux fichiers audio (presentateur et invite)"
+)
 
 
 if __name__ == "__main__":
-    main()
+    interface.launch()

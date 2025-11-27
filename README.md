@@ -20,6 +20,16 @@ Accepter les conditions : https://huggingface.co/pyannote/speaker-diarization-3.
 
 ## Utilisation
 
+### Interface Gradio (recommandé)
+
+```bash
+python app.py
+```
+
+Ouvrir le navigateur à l'adresse affichée et uploader les deux fichiers audio.
+
+### Ligne de commande
+
 ```bash
 python main.py --presentateur mic1.wav --invite mic2.wav
 ```
@@ -32,5 +42,3 @@ Resultat dans `results/diarisation.txt`
 2. Compare l'energie audio entre les deux micros
 3. Attribue chaque segment au bon locuteur
 4. Detecte les chevauchements
-
-Le buffer de 0.250s etend chaque segment pour eviter les coupures.
